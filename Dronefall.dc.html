@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="images/crosshair.png">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#1b1b1b;overflow:hidden;}
+  *{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}
+  img{image-rendering:pixelated;image-rendering:crisp-edges;-webkit-user-drag:none;}
+  @keyframes df-blink{0%,49%{opacity:1}50%,100%{opacity:.25}}
+  @keyframes df-scan{0%{transform:translateY(0)}100%{transform:translateY(4px)}}
+  @keyframes df-shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-5px,3px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(4px,2px)}}
+  @keyframes df-heartshake{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(-2px,1px) scale(1.15)}75%{transform:translate(2px,-1px) scale(1.15)}}
+  @keyframes df-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  @keyframes df-pop{0%{transform:scale(.6);opacity:0}40%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:1}}
+  @keyframes df-keypulse{from{transform:scale(1);opacity:1}to{transform:scale(1.06);opacity:.55}}
+</style>
+</helmet>
+<div ref="{{ arenaRef }}" style="position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:#1b1b1b;font-family:'Press Start 2P',monospace;touch-action:none;">
+
+  <!-- 1. SKY gradient -->
+  <div style="position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,#3a1e6b 0%,#5a32a8 42%,#3a1e6b 66%,#231641 82%,#1b1b1b 100%);"></div>
+  <!-- stars -->
+  <img src="images/stars.webp" alt="" style="position:absolute;inset:-6% 0 auto 0;width:100%;height:70%;object-fit:cover;z-index:1;opacity:.55;"/>
+  <!-- 2. CITY (right) -->
+  <img src="images/city.webp" alt="" style="position:absolute;right:0;bottom:18vh;width:62vw;height:auto;z-index:2;opacity:.85;filter:brightness(.42) saturate(.7);"/>
+  <!-- 3. TREES (left) -->
+  <img src="images/trees.webp" alt="" style="position:absolute;left:-3vw;bottom:16vh;width:46vw;height:auto;z-index:3;filter:brightness(.5) saturate(.8);"/>
+  <!-- ground -->
+  <div style="position:absolute;left:0;right:0;bottom:0;height:21vh;z-index:4;background:linear-gradient(180deg,#2a1c47 0%,#1b1330 30%,#121018 100%);"></div>
+  <div style="position:absolute;left:0;right:0;bottom:20.6vh;height:.6vh;z-index:4;background:#6b4fb0;opacity:.6;"></div>
+  <!-- scanlines -->
+  <div style="position:absolute;inset:0;z-index:60;pointer-events:none;background:repeating-linear-gradient(180deg,transparent,transparent 3px,rgba(255,255,255,.045) 3px,rgba(255,255,255,.045) 4px);"></div>
+
+  <!-- TRAIN -->
+  <div ref="{{ trainRef }}" style="position:absolute;left:0;top:63vh;z-index:10;display:flex;align-items:flex-end;will-change:transform;filter:drop-shadow(0 6px 0 rgba(0,0,0,.35));">
+    <sc-for list="{{ trainCars }}" as="car" hint-placeholder-count="4">
+      <img src="{{ car.src }}" alt="" style="height:13vh;width:auto;display:block;"/>
+    </sc-for>
+  </div>
+
+  <!-- ENEMY LAYER -->
+  <div ref="{{ enemyRef }}" style="position:absolute;inset:0;z-index:80;pointer-events:none;"></div>
+  <!-- BOOM LAYER -->
+  <div ref="{{ boomRef }}" style="position:absolute;inset:0;z-index:85;pointer-events:none;"></div>
+
+  <!-- TRUCK (player) -->
+  <img src="images/truck.webp" alt="" style="position:absolute;left:1vw;bottom:14vh;width:26vw;height:auto;z-index:90;filter:drop-shadow(0 4px 0 rgba(0,0,0,.4));"/>
+
+  <!-- INTERCEPTOR LAYER -->
+  <div ref="{{ shotRef }}" style="position:absolute;inset:0;z-index:91;pointer-events:none;"></div>
+
+  <!-- CROSSHAIR -->
+  <img ref="{{ crossRef }}" src="images/crosshair.png" alt="" style="position:absolute;left:0;top:0;width:clamp(40px,4vw,72px);height:clamp(40px,4vw,72px);z-index:95;pointer-events:none;will-change:transform;"/>
+
+  <!-- HUD -->
+  <div style="position:absolute;top:0;left:0;right:0;height:9vh;min-height:54px;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.4vw;background:linear-gradient(180deg,rgba(15,12,24,.82) 0%,rgba(15,12,24,.45) 70%,transparent 100%);">
+    <div ref="{{ scoreRef }}" style="color:#e7e7e7;font-size:clamp(11px,1.4vw,20px);letter-spacing:-.04em;text-shadow:2px 2px 0 #1b1b1b;">{{ scoreText }}</div>
+    <div style="color:{{ timerColor }};font-size:clamp(16px,2.1vw,30px);letter-spacing:-.02em;text-shadow:2px 2px 0 #1b1b1b;{{ timerAnim }}">{{ timeText }}</div>
+    <div ref="{{ heartsRef }}" style="display:flex;gap:.7vw;align-items:center;">
+      <sc-for list="{{ heartSrcs }}" as="h" hint-placeholder-count="3">
+        <img src="{{ h }}" alt="" style="height:clamp(22px,2.6vw,38px);width:auto;display:block;"/>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- desktop hint -->
+  <sc-if value="{{ showDesktopHint }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;left:50%;bottom:2.4vh;transform:translateX(-50%);z-index:99;color:#e7e7e7;opacity:.45;font-size:clamp(8px,.85vw,12px);letter-spacing:-.03em;text-align:center;line-height:1.7;">МИШʹ / СТРІЛКИ — ПРИЦІЛ &nbsp;·&nbsp; SPACE — ПОСТРІЛ</div>
+  </sc-if>
+
+  <!-- FIRE button (mobile) -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+    <button onClick="{{ fire }}" style="position:fixed;right:4vw;bottom:4vw;width:19vw;height:19vw;max-width:120px;max-height:120px;z-index:110;border:3px solid #0e0e16;border-radius:14px;background:#e74c3c;box-shadow:0 5px 0 #8c2519, inset 0 3px 0 rgba(255,255,255,.25);color:#fff;font-family:'Press Start 2P',monospace;font-size:clamp(11px,3.6vw,18px);letter-spacing:-.04em;padding:0;cursor:pointer;" style-active="transform:translateY(4px);box-shadow:0 1px 0 #8c2519, inset 0 3px 0 rgba(255,255,255,.2);background:#c0392b;">FIRE</button>
+  </sc-if>
+
+  <!-- ============ SCREEN: SOUND ============ -->
+  <sc-if value="{{ showSound }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;inset:0;z-index:200;background:#1b1b1b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5vh;text-align:center;">
+      <div style="color:#e7e7e7;text-transform:uppercase;font-size:clamp(16px,2.6vw,34px);line-height:1.5;letter-spacing:-.04em;">УВІМКНИ ЗВУК<br/>ДЛЯ КРАЩОГО ДОСВІДУ</div>
+      <div style="display:flex;gap:6vw;align-items:center;">
+        <img onClick="{{ soundOn }}" src="images/soundon.svg" alt="sound on" style="width:clamp(46px,4.6vw,72px);height:auto;cursor:pointer;animation:df-keypulse .7s ease-out infinite alternate;"/>
+        <img onClick="{{ soundOff }}" src="images/soundoff.svg" alt="sound off" style="width:clamp(46px,4.6vw,72px);height:auto;cursor:pointer;animation:df-keypulse .7s ease-out .35s infinite alternate;"/>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ SCREEN: CONTROLS ============ -->
+  <sc-if value="{{ showControls }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;inset:0;z-index:200;background:#1b1b1b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4.2vh;text-align:center;padding:4vw;">
+      <div style="color:#ffd200;text-transform:uppercase;font-size:clamp(20px,3.4vw,46px);letter-spacing:-.04em;text-shadow:3px 3px 0 #37255d;">ДРОНОПАД</div>
+      <div style="color:#e7e7e7;text-transform:uppercase;font-size:clamp(11px,1.35vw,18px);line-height:1.9;letter-spacing:-.03em;max-width:46ch;">ЗАХИСТИ ПОТЯГ УКРЗАЛІЗНИЦІ.<br/>ЗБИВАЙ ВОРОЖІ ДРОНИ ПЕРЕХОПЛЮВАЧАМИ.<br/>ПРОТРИМАЙСЯ 60 СЕКУНД.</div>
+      <div style="display:flex;gap:3vw;flex-wrap:wrap;justify-content:center;color:#9f87e3;font-size:clamp(9px,1vw,13px);line-height:1.8;letter-spacing:-.03em;">
+        <div>{{ ctrlAim }}</div>
+        <div>{{ ctrlFire }}</div>
+      </div>
+      <button onClick="{{ startGame }}" style="margin-top:1vh;font-family:'Press Start 2P',monospace;font-size:clamp(13px,1.7vw,24px);letter-spacing:-.04em;color:#1b1b1b;background:#e7e7e7;border:3px solid #37255d;border-radius:8px;padding:1.2em 2.4em;cursor:pointer;text-transform:uppercase;box-shadow:0 5px 0 #37255d;" style-hover="background:#9f87e3;" style-active="transform:translateY(4px);box-shadow:0 1px 0 #37255d;">СТАРТ</button>
+    </div>
+  </sc-if>
+
+  <!-- ============ SCREEN: RESULT ============ -->
+  <sc-if value="{{ showResult }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;inset:0;z-index:210;background:{{ resultBg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3.4vh;text-align:center;padding:4vw;">
+      <div style="font-size:clamp(8px,5vw,90px);line-height:1;animation:df-float 2.4s ease-in-out infinite;">{{ resultEmoji }}</div>
+      <div style="color:{{ resultColor }};text-transform:uppercase;font-size:clamp(22px,4vw,58px);letter-spacing:-.04em;text-shadow:3px 3px 0 #1b1b1b;animation:df-pop .5s ease-out;">{{ resultTitle }}</div>
+      <div style="color:#e7e7e7;text-transform:uppercase;font-size:clamp(11px,1.5vw,20px);line-height:1.8;letter-spacing:-.03em;">{{ resultSub }}</div>
+      <div style="color:#ffd200;text-transform:uppercase;font-size:clamp(13px,1.8vw,26px);letter-spacing:-.03em;text-shadow:2px 2px 0 #1b1b1b;">{{ resultScore }}</div>
+      <button onClick="{{ playAgain }}" style="margin-top:1.4vh;font-family:'Press Start 2P',monospace;font-size:clamp(13px,1.8vw,26px);letter-spacing:-.04em;color:#1b1b1b;background:#e7e7e7;border:3px solid #37255d;border-radius:8px;padding:1.2em 2.4em;cursor:pointer;text-transform:uppercase;box-shadow:0 5px 0 #37255d;" style-hover="background:#9f87e3;" style-active="transform:translateY(4px);box-shadow:0 1px 0 #37255d;">PLAY AGAIN</button>
+      <div style="margin-top:2.2vh;color:#e7e7e7;font-size:clamp(10px,1.2vw,16px);text-transform:uppercase;letter-spacing:-.04em;line-height:1.4;">Донать на Дронопад</div>
+      <img src="images/donate_qr.png" alt="Donate QR code" style="margin-top:1.2vh;width:clamp(120px,16vw,170px);height:auto;border:4px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.35);"/>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100vw&quot;,&quot;height&quot;:&quot;100vh&quot;}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    const mob = (typeof navigator!=='undefined') && (/iphone|ipod|ipad|android/i.test(navigator.userAgent) || (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
+    this.isMobile = !!mob;
+    this.state = {
+      phase: 'sound',           // sound | controls | playing | win | lose
+      score: 0,
+      timeLeft: 60,
+      hp: 3,
+      soundOn: !this.isMobile,
+      trainCars: this._cars(3),
+    };
+    this.g = null;
+    // bound ref setters
+    this.arenaRef = (el)=>{ this.arena = el; };
+    this.trainRef = (el)=>{ this.train = el; };
+    this.enemyRef = (el)=>{ this.enemyLayer = el; };
+    this.shotRef  = (el)=>{ this.shotLayer = el; };
+    this.boomRef  = (el)=>{ this.boomLayer = el; };
+    this.crossRef = (el)=>{ this.cross = el; };
+    this.scoreRef = (el)=>{ this.scoreEl = el; };
+    this.heartsRef= (el)=>{ this.heartsEl = el; };
+    // bound handlers
+    this.soundOn  = ()=>{ this.setState({soundOn:true},()=>this._toControls()); };
+    this.soundOff = ()=>{ this.setState({soundOn:false},()=>this._toControls()); };
+    this.startGame= ()=>{ this._beginGame(false); };
+    this.playAgain= ()=>{ this._beginGame(true); };
+    this.fire     = ()=>{ this._fire(); };
+    // sprite pools
+    this.ENEMIES = [
+      {src:'images/zala.webp', h:9, spd:0.26, ar:0.67},
+      {src:'images/orlan.webp', h:9, spd:0.20, ar:0.67},
+      {src:'images/supercam.webp', h:9.5, spd:0.27, ar:0.31},
+      {src:'images/shahed.webp', h:7, spd:0.34, ar:1.5},
+    ];
+    this.FALL = ['images/fall10.webp','images/fall9.webp','images/fall8.webp'];
+    this.BOOM = ['images/bam1.webp','images/bam2.webp','images/bam3.webp'];
+  }
+
+  _cars(hp){
+    const tail='images/train_tail.png', wag='images/train_wagon.png', wagD='images/train_wagon_damaged.png', eng='images/train_engine.png', engD='images/train_engine_damaged.png';
+    if(hp>=3) return [{src:tail},{src:wag},{src:wag},{src:eng}];
+    if(hp===2) return [{src:tail},{src:wag},{src:wagD},{src:eng}];
+    return [{src:tail},{src:wagD},{src:wagD},{src:engD}];
+  }
+
+  // ---------- audio ----------
+  _initAudio(){
+    if(this._audio) return;
+    const mk=(u)=>{ const a=new Audio(); a.src=u; a.preload='auto'; a.volume=0.32; return a; };
+    this._audio = {
+      shoot: mk('audio/shooting.wav'),
+      kill:  mk('audio/target.wav'),
+      hit:   mk('audio/popup.wav'),
+      main:  mk('audio/lenta.wav'),
+    };
+    this._audio.main.loop = true; this._audio.main.volume = 0.18;
+  }
+  _play(n){
+    if(!this.state.soundOn || !this._audio) return;
+    const s=this._audio[n]; if(!s) return;
+    try{ s.currentTime=0; const p=s.play(); if(p) p.catch(()=>{}); }catch(e){}
+  }
+
+  // ---------- screen flow ----------
+  _toControls(){ this.setState({phase:'controls'}); }
+
+  _beginGame(skipReset){
+    this._initAudio();
+    this.setState({phase:'playing', score:0, timeLeft:60, hp:3, trainCars:this._cars(3)});
+    // (re)build world
+    this._clearLayers();
+    this._setupWorld();
+    this._startTimer();
+    this._loopOn();
+    if(this.state.soundOn){ try{ this._audio.main.currentTime=0; this._audio.main.play().catch(()=>{}); }catch(e){} }
+  }
+
+  _clearLayers(){
+    [this.enemyLayer,this.shotLayer,this.boomLayer].forEach(l=>{ if(l) l.innerHTML=''; });
+  }
+
+  componentDidMount(){
+    this._onKey = (e)=>this._key(e);
+    this._onMove = (e)=>this._pointer(e);
+    this._onResize = ()=>this._measure();
+    window.addEventListener('keydown', this._onKey);
+    window.addEventListener('mousemove', this._onMove, {passive:true});
+    window.addEventListener('touchmove', this._onMove, {passive:false});
+    window.addEventListener('touchstart', this._onMove, {passive:false});
+    window.addEventListener('resize', this._onResize);
+    document.addEventListener('visibilitychange', ()=>{ this._visible = !document.hidden; });
+    this._visible = true;
+  }
+  componentWillUnmount(){
+    window.removeEventListener('keydown', this._onKey);
+    window.removeEventListener('mousemove', this._onMove);
+    window.removeEventListener('touchmove', this._onMove);
+    window.removeEventListener('touchstart', this._onMove);
+    window.removeEventListener('resize', this._onResize);
+    this._loopOff(); clearInterval(this._timer);
+  }
+
+  _measure(){
+    if(!this.arena) return;
+    const r = this.arena.getBoundingClientRect();
+    this.W = r.width; this.H = r.height;
+  }
+
+  _setupWorld(){
+    this._measure();
+    const W=this.W,H=this.H;
+    // launch point = right edge of truck (~26vw + 1vw left) at its top
+    this.launch = { x: W*0.1, y: H*0.72 };
+    // crosshair start center
+    this.cx = W*0.52; this.cy = H*0.36;
+    this.tx = this.cx; this.ty = this.cy;
+    this._placeCross();
+    // train
+    const tw = this.train ? this.train.offsetWidth : W*0.7;
+    this.trainW = tw || W*0.7;
+    const dir = Math.random()<0.5 ? 1 : -1;
+    this.trainX = dir>0 ? -this.trainW*0.4 : W - this.trainW*0.6;
+    this.trainDir = dir;
+    this.trainSpeed = (W + this.trainW) / 22; // px/sec, cross in ~22s
+    this._placeTrain();
+    // pools
+    this.g = { enemies:[], shots:[], lastSpawn:0, spawnGap:1700, last:0 };
+    this.running = true;
+  }
+
+  _placeCross(){ if(this.cross) this.cross.style.transform = `translate(${this.cx}px,${this.cy}px) translate(-50%,-50%)`; }
+  _placeTrain(){ if(this.train) this.train.style.transform = `translateX(${this.trainX}px)`; }
+
+  // ---------- input ----------
+  _key(e){
+    if(this.state.phase!=='playing'){
+      if((e.key===' '||e.key==='Enter')){ /* allow */ }
+      return;
+    }
+    const step = Math.max(22, this.W*0.018);
+    let h=true;
+    if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') this.cy-=step;
+    else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') this.cy+=step;
+    else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') this.cx-=step;
+    else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') this.cx+=step;
+    else if(e.key===' '||e.key==='Enter'){ this._fire(); h=true; }
+    else h=false;
+    if(h){ e.preventDefault(); this._clampCross(); this.tx=this.cx; this.ty=this.cy; this._placeCross(); }
+  }
+  _pointer(e){
+    if(this.state.phase!=='playing' || !this.arena) return;
+    let px,py;
+    if(e.touches && e.touches[0]){ px=e.touches[0].clientX; py=e.touches[0].clientY; if(e.cancelable) e.preventDefault(); }
+    else { px=e.clientX; py=e.clientY; }
+    const r=this.arena.getBoundingClientRect();
+    this.tx = px - r.left; this.ty = py - r.top;
+    if(this.isMobile){ this.cx=this.tx; this.cy=this.ty; this._clampCross(); this._placeCross(); }
+  }
+  _clampCross(){
+    this.cx = Math.max(this.W*0.02, Math.min(this.cx, this.W*0.98));
+    this.cy = Math.max(this.H*0.06, Math.min(this.cy, this.H*0.78));
+  }
+
+  // ---------- fire ----------
+  _fire(){
+    if(this.state.phase!=='playing' || !this.g) return;
+    const now = performance.now();
+    if(now - (this._lastShot||0) < 380) return;
+    if(this.g.shots.length >= 3) return;
+    this._lastShot = now;
+    const sx=this.launch.x, sy=this.launch.y;
+    let dx=this.cx-sx, dy=this.cy-sy;
+    const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+    const node=document.createElement('img');
+    node.src='images/interceptor_2.png';
+    const sz=Math.max(34, this.W*0.032);
+    node.style.cssText=`position:absolute;left:0;top:0;width:${sz}px;height:${sz}px;will-change:transform;`;
+    this.shotLayer.appendChild(node);
+    const ang=Math.atan2(dy,dx)*180/Math.PI;
+    const shot={node,x:sx,y:sy,dx,dy,sz,ang,spd:this.W*1.25};
+    node.style.transform=`translate(${sx}px,${sy}px) translate(-50%,-50%) rotate(${ang}deg)`;
+    this.g.shots.push(shot);
+    this._play('shoot');
+    if(this.cross){ this.cross.style.transition='transform .08s'; this.cross.animate?.([{filter:'brightness(2.2)'},{filter:'brightness(1)'}],{duration:200}); }
+  }
+
+  // ---------- spawn ----------
+  _spawn(){
+    const W=this.W,H=this.H;
+    const t=this.ENEMIES[Math.floor(Math.random()*this.ENEMIES.length)];
+    const node=document.createElement('img');
+    node.src=t.src;
+    const h=H*t.h/100; const w=h*t.ar;
+    node.style.cssText=`position:absolute;left:0;top:0;height:${h}px;width:${w}px;will-change:transform;filter:drop-shadow(0 3px 0 rgba(0,0,0,.3));`;
+    this.enemyLayer.appendChild(node);
+    const spawnY = H*(0.12 + Math.random()*0.34);
+    const targetY = H*0.62; // train top band
+    const x = W + w;
+    const vx = W * t.spd; // px/sec leftward
+    // descend so reaches train band around x ~ 0.26W
+    const dist = (W+w) - W*0.26;
+    const time = dist / vx;
+    const vy = (targetY - spawnY) / Math.max(time,0.5);
+    const e={node,x,y:spawnY,w,h,vx,vy,alive:true};
+    node.style.transform=`translate(${x}px,${spawnY}px)`;
+    this.g.enemies.push(e);
+  }
+
+  // ---------- loop ----------
+  _loopOn(){ this._loopOff(); this.g.last=performance.now(); this._raf=requestAnimationFrame((t)=>this._tick(t)); }
+  _loopOff(){ if(this._raf) cancelAnimationFrame(this._raf); this._raf=null; }
+
+  _tick(ts){
+    if(!this.running){ return; }
+    this._raf=requestAnimationFrame((t)=>this._tick(t));
+    const g=this.g; if(!g) return;
+    let dt=(ts-g.last)/1000; g.last=ts;
+    if(dt>0.05) dt=0.05;
+    if(!this._visible) return;
+    const W=this.W,H=this.H;
+
+    // train
+    this.trainX += this.trainDir*this.trainSpeed*dt;
+    if(this.trainDir>0 && this.trainX > W) this.trainX = -this.trainW;
+    if(this.trainDir<0 && this.trainX < -this.trainW) this.trainX = W;
+    this._placeTrain();
+    const trainRect = this.train ? this.train.getBoundingClientRect() : null;
+    const ar = this.arena.getBoundingClientRect();
+
+    // crosshair ease toward target (desktop mouse / keys already direct)
+    if(!this.isMobile){
+      this.cx += (this.tx-this.cx)*Math.min(1,dt*16);
+      this.cy += (this.ty-this.cy)*Math.min(1,dt*16);
+      this._clampCross(); this._placeCross();
+    }
+
+    // spawn
+    g.lastSpawn += dt*1000;
+    const activeGap = Math.max(900, g.spawnGap - this.state.score*18);
+    if(g.lastSpawn > activeGap && g.enemies.filter(e=>e.alive).length < 4){
+      g.lastSpawn=0; this._spawn();
+    }
+
+    // enemies
+    for(let i=g.enemies.length-1;i>=0;i--){
+      const e=g.enemies[i];
+      if(!e.alive) continue;
+      e.x -= e.vx*dt; e.y += e.vy*dt;
+      e.node.style.transform=`translate(${e.x}px,${e.y}px)`;
+      // hit train? compare arena-local boxes
+      if(trainRect){
+        const tL=trainRect.left-ar.left, tT=trainRect.top-ar.top, tR=trainRect.right-ar.left, tB=trainRect.bottom-ar.top;
+        const eL=e.x+e.w*0.2, eR=e.x+e.w*0.8, eT=e.y+e.h*0.2, eB=e.y+e.h*0.9;
+        if(eR>tL && eL<tR && eB>tT && eT<tB){
+          this._trainHit(e); e.alive=false; e.node.remove(); g.enemies.splice(i,1); continue;
+        }
+      }
+      if(e.x < -e.w-4){ e.node.remove(); g.enemies.splice(i,1); }
+    }
+
+    // shots
+    for(let i=g.shots.length-1;i>=0;i--){
+      const s=g.shots[i];
+      s.x += s.dx*s.spd*dt; s.y += s.dy*s.spd*dt;
+      s.node.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%) rotate(${s.ang}deg)`;
+      if(s.x<-40||s.x>W+40||s.y<-40||s.y>H+40){ s.node.remove(); g.shots.splice(i,1); continue; }
+      // collide with enemies
+      for(let j=g.enemies.length-1;j>=0;j--){
+        const e=g.enemies[j]; if(!e.alive) continue;
+        if(s.x>e.x+e.w*0.1 && s.x<e.x+e.w*0.9 && s.y>e.y+e.h*0.05 && s.y<e.y+e.h*0.95){
+          this._killEnemy(e); e.alive=false; g.enemies.splice(j,1);
+          s.node.remove(); g.shots.splice(i,1); break;
+        }
+      }
+    }
+  }
+
+  _killEnemy(e){
+    this._play('kill');
+    // boom
+    const boom=document.createElement('img');
+    boom.src=this.BOOM[Math.floor(Math.random()*this.BOOM.length)];
+    boom.style.cssText=`position:absolute;left:0;top:0;width:${e.w*1.3}px;height:auto;transform:translate(${e.x+e.w*0.2}px,${e.y}px);pointer-events:none;`;
+    this.boomLayer.appendChild(boom);
+    // falling wreck
+    const fall=document.createElement('img');
+    fall.src=this.FALL[Math.floor(Math.random()*this.FALL.length)];
+    fall.style.cssText=`position:absolute;left:0;top:0;height:${e.h}px;width:auto;pointer-events:none;`;
+    this.boomLayer.appendChild(fall);
+    let fy=e.y, fx=e.x, vy=2, t0=performance.now();
+    const fi=setInterval(()=>{ vy+=0.6; fy+=vy; fx-=4; fall.style.transform=`translate(${fx}px,${fy}px) rotate(${(performance.now()-t0)/6}deg)`;
+      if(fy>this.H*0.8){ clearInterval(fi); fall.remove(); } },30);
+    setTimeout(()=>boom.remove(),320);
+    e.node.remove();
+    this.setState(s=>({score:s.score+1}));
+    if(this.scoreEl){ this.scoreEl.animate?.([{color:'#ffd200',transform:'scale(1.18)'},{color:'#e7e7e7',transform:'scale(1)'}],{duration:300}); }
+  }
+
+  _trainHit(e){
+    this._play('hit');
+    // boom on train
+    const boom=document.createElement('img');
+    boom.src=this.BOOM[Math.floor(Math.random()*this.BOOM.length)];
+    boom.style.cssText=`position:absolute;left:0;top:0;width:${e.w*1.4}px;height:auto;transform:translate(${e.x}px,${e.y}px);pointer-events:none;`;
+    this.boomLayer.appendChild(boom);
+    setTimeout(()=>boom.remove(),360);
+    // red flash + shake
+    const flash=document.createElement('div');
+    flash.style.cssText='position:absolute;inset:0;z-index:96;pointer-events:none;background:rgba(231,76,60,.55);';
+    this.arena.appendChild(flash);
+    setTimeout(()=>flash.remove(),260);
+    if(this.arena){ this.arena.style.animation='df-shake .22s'; setTimeout(()=>{ if(this.arena) this.arena.style.animation=''; },230); }
+    const hp = Math.max(0, this.state.hp-1);
+    this.setState({hp, trainCars:this._cars(hp)});
+    if(this.heartsEl){ this.heartsEl.style.animation='df-heartshake .3s'; setTimeout(()=>{ if(this.heartsEl) this.heartsEl.style.animation=''; },300); }
+    if(hp<=0) this._end(false);
+  }
+
+  // ---------- timer / end ----------
+  _startTimer(){
+    clearInterval(this._timer);
+    this._timer=setInterval(()=>{
+      if(this.state.phase!=='playing'){ return; }
+      const t=this.state.timeLeft-1;
+      if(t<=0){ this.setState({timeLeft:0}); this._end(true); }
+      else this.setState({timeLeft:t});
+    },1000);
+  }
+
+  _end(win){
+    if(this.state.phase!=='playing') return;
+    this.running=false; this._loopOff(); clearInterval(this._timer);
+    try{ this._audio && this._audio.main.pause(); }catch(e){}
+    this.setState({phase: win?'win':'lose'});
+  }
+
+  // ---------- render ----------
+  renderVals(){
+    const s=this.state;
+    const pad=(n)=>String(n).padStart(2,'0');
+    const danger = s.timeLeft<10;
+    const heart='images/heart_full.png', empty='images/heart_empty.png';
+    const hearts=[s.hp>=1?heart:empty, s.hp>=2?heart:empty, s.hp>=3?heart:empty];
+    const win = s.phase==='win';
+    return {
+      arenaRef:this.arenaRef, trainRef:this.trainRef, enemyRef:this.enemyRef,
+      shotRef:this.shotRef, boomRef:this.boomRef, crossRef:this.crossRef,
+      scoreRef:this.scoreRef, heartsRef:this.heartsRef,
+      soundOn:this.soundOn, soundOff:this.soundOff, startGame:this.startGame,
+      playAgain:this.playAgain, fire:this.fire,
+      isMobile:this.isMobile,
+      showDesktopHint: s.phase==='playing' && !this.isMobile,
+      trainCars:s.trainCars,
+      scoreText:`ЗБИТО: ${s.score}`,
+      timeText:`00:${pad(s.timeLeft)}`,
+      timerColor: danger ? '#e74c3c' : '#e7e7e7',
+      timerAnim: danger ? 'animation:df-blink .6s steps(1) infinite;' : '',
+      heartSrcs:hearts,
+      showSound: s.phase==='sound',
+      showControls: s.phase==='controls',
+      showResult: win || s.phase==='lose',
+      ctrlAim: this.isMobile ? 'ТЯГНИ ПАЛЬЦЕМ — ПРИЦІЛ' : 'МИШʹ / WASD / СТРІЛКИ — ПРИЦІЛ',
+      ctrlFire: this.isMobile ? 'КНОПКА FIRE — ПОСТРІЛ' : 'SPACE / ENTER — ПОСТРІЛ',
+      resultBg: win ? 'rgba(27,40,30,.92)' : 'rgba(40,20,24,.93)',
+      resultColor: win ? '#5fd97a' : '#e74c3c',
+      resultEmoji: win ? '🛡️' : '💥',
+      resultTitle: win ? 'Місію завершено' : 'Місію провалено',
+      resultSub: win ? 'ПОТЯГ ВРЯТОВАНО' : 'ПОТЯГ ЗНИЩЕНО',
+      resultScore: `ДРОНІВ ЗБИТО: ${s.score}`,
+    };
+  }
+}
+</script>
+</body>
+</html>
